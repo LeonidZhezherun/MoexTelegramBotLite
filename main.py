@@ -122,7 +122,7 @@ def stock_buy_add(message):
     else:
         try:
             number = int(message.text.strip().split(' ')[1])
-            stock = stock_code[stock_code['code'] == code]['stock'].to_string(index=False).upper()
+            stock = stock_code[stock_code['code'] == code]['stock'].to_string(index=False)
             db = sqlite3.connect('moex_bot.sql')
             cur = db.cursor()
             sql = """
