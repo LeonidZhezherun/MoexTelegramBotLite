@@ -71,7 +71,7 @@ def menu_text(message):
             cur = db.cursor()
 
             sql = """
-            SELECT * FROM portfolio WHERE id = ? ORDER BY number DESC
+            SELECT * FROM portfolio WHERE id = ? ORDER BY code
             """
             cur.execute(sql, (id,))
             for i in cur.fetchall():
