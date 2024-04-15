@@ -79,7 +79,7 @@ def menu_text(message):
                     str(i[3]).ljust(17 - len(str(i[3]))) + \
                     str(last_price_stock(i[1])).ljust(26 - len(str(last_price_stock(i[1])))) + \
                     str(round(last_price_stock(i[1]) * i[3], 2)).ljust(40 - len(str(round(last_price_stock(i[1]) * i[3], 2)))) + '\n'
-            text += f'Общая стоимость портфеля: {total} руб'
+            text += '\n' + f'Общая стоимость портфеля: {total} руб'
             cur.close()
             db.close()
             bot.send_message(message.chat.id, text, parse_mode='HTML')
