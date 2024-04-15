@@ -59,6 +59,7 @@ def menu_text(message):
             "only=marketdata&marketdata.columns=SECID,LAST"
         quotes_csv_text = requests.get(url).text.split('\n')
         if len(quotes_csv_text[2].split(';')[1]) == 0:
+
             bot.send_message(message.chat.id, f'{message.from_user.first_name}, извините, сейчас нет доступа '
                                                     f'к серверу биржи, поробуйте, пожалуйста, позже')
         else:
@@ -106,7 +107,7 @@ def last_price_stock(code):
 def stock_buy_add(message):
     """
     Принимает на вход сообщение, отправленное полсе "Купил акции", проверяет сообщение на ошибки воода
-    и удаляет акции из портфеля (БД)
+    и добавляет акции в портфель (БД)
     """
     stock_code = pd.read_excel("stock_code.xlsx")
 
