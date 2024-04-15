@@ -33,17 +33,14 @@ def start(message):
     bot.send_message(message.chat.id, mess)
     main_menu(message)
 
-
-# @bot.message_handler(commands=['menu'])
 def main_menu(message):
     """
     Создает и выывдит главное меню
     """
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     show_portfolio = types.KeyboardButton('Состав и стоимость портфеля')
-    add_to_portfolio = types.KeyboardButton('Купил акции, добваить в портфель')
-    delete_from_portfolio = types.KeyboardButton('Продал акции, удалить из портфеля')
-    markup.add(show_portfolio, add_to_portfolio, delete_from_portfolio)
+    change_portfolio = types.KeyboardButton('Изменить портфель')
+    markup.add(show_portfolio, change_portfolio)
     bot.send_message(message.chat.id, 'Выберите действие', reply_markup=markup)
     bot.register_next_step_handler(message, menu_text)
 
@@ -58,12 +55,26 @@ def menu_text(message):
             "shares/boards/TQBR/securities.csv?iss.meta=off&iss." \
             "only=marketdata&marketdata.columns=SECID,LAST"
         quotes_csv_text = requests.get(url).text.split('\n')
+        id = message.chat.id
         if len(quotes_csv_text[2].split(';')[1]) == 0:
+            bot.send_message(message.chat.id, f'{message.from_user.first_name}, извините, нет доступа '
+                                                    f'к серверу биржи, котировки и стоимость сейчас показать не согу, '
+                                                    f'поробуйте, пожалуйста, позже')
+            text = 'Код       Кол-во'
+            db = sqlite3.connect('moex_bot.sql')
+            cur = db.cursor()
 
-            bot.send_message(message.chat.id, f'{message.from_user.first_name}, извините, сейчас нет доступа '
-                                                    f'к серверу биржи, поробуйте, пожалуйста, позже')
+            sql = """
+            SELECT * FROM portfolio WHERE id = ? ORDER BY code
+            """
+            cur.execute(sql, (id,))
+            for i in cur.fetchall():
+                text += i[1].ljust(13 - len(str(i[1]))) + \
+                    str(i[3]).ljust(17 - len(str(i[3]))) + '\n'
+            cur.close()
+            db.close()
+            bot.send_message(message.chat.id, text)
         else:
-            id = message.chat.id
             text = 'Код       Кол-во      Котировка     Стоимость\n'
             total = 0
 
@@ -83,15 +94,10 @@ def menu_text(message):
             text += '\n' + f'Общая стоимость портфеля: {total} руб'
             cur.close()
             db.close()
-            bot.send_message(message.chat.id, text, parse_mode='HTML')
+            bot.send_message(message.chat.id, text)
         main_menu(message)
-
-    elif message.text == 'Купил акции, добваить в портфель':
-        bot.send_message(message.chat.id, 'Введите через пробел код акции и купленное количество, например: SBER 200')
-        bot.register_next_step_handler(message, stock_buy_add)
-    elif message.text == 'Продал акции, удалить из портфеля':
-        bot.send_message(message.chat.id, 'Введите через пробел код акции и проданное количество, например: GAZP 150')
-        bot.register_next_step_handler(message, stock_sell_delete)
+    elif message.text == 'Изменить портфель':
+        change_portfolio(message)
 
 
 def last_price_stock(code):
@@ -102,7 +108,34 @@ def last_price_stock(code):
         quotes_csv_tabl = quotes_csv_line.split(';')
         if quotes_csv_tabl[0] == code:
             return float(quotes_csv_tabl[1])
+def change_portfolio(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    add_to_portfolio = types.KeyboardButton('Купил акции, добваить в портфель')
+    delete_from_portfolio = types.KeyboardButton('Продал акции, удалить из портфеля')
+    delete_portfolio = types.KeyboardButton('Удалить портфель')
+    back = types.KeyboardButton('Назад')
+    markup.add(add_to_portfolio, delete_from_portfolio, delete_portfolio, back)
+    bot.send_message(message.chat.id, 'Выберите действие', reply_markup=markup)
+    bot.register_next_step_handler(message, change_portfolio_text)
 
+@bot.message_handler(content_types=["text"])
+def change_portfolio_text(message):
+    if message.text == 'Купил акции, добваить в портфель':
+        bot.send_message(message.chat.id, 'Введите через пробел код акции и купленное количество, например: SBER 200')
+        bot.register_next_step_handler(message, stock_buy_add)
+    elif message.text == 'Продал акции, удалить из портфеля':
+        bot.send_message(message.chat.id, 'Введите через пробел код акции и проданное количество, например: GAZP 150')
+        bot.register_next_step_handler(message, stock_sell_delete)
+    elif message.text == 'Удалить портфель':
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+        yes_delete = types.KeyboardButton('Да, удалить')
+        no_back = types.KeyboardButton('Нет, назад')
+        markup.add(yes_delete, no_back)
+        text = 'Вы точно хотите удалить портфель? Это действие необратимо'
+        bot.send_message(message.chat.id, text, reply_markup=markup)
+        bot.register_next_step_handler(message, delete_portfolio_text)
+    elif message.text == 'Назад':
+        main_menu(message)
 
 def stock_buy_add(message):
     """
@@ -157,10 +190,8 @@ def stock_buy_add(message):
         except:
             bot.send_message(message.chat.id, f'{message.from_user.first_name}, вторым значением должно '
                                                     f'быть число акций, пожалуйста, попробуйте еще раз')
-    main_menu(message)
+    change_portfolio(message)
 
-
-# @bot.message_handler(content_types=['text'])
 def stock_sell_delete(message):
     """
     Принимает на вход сообщение, отправленное полсе "Продал акции", проверяет сообщение на ошибки воода
@@ -220,7 +251,24 @@ def stock_sell_delete(message):
         except:
             bot.send_message(message.chat.id, f'{message.from_user.first_name}, вторым значением должно быть число '
                                                     f'акций, пожалуйста, попробуйте еще раз')
-    main_menu(message)
+    change_portfolio(message)
 
+@bot.message_handler(content_types=["text"])
+def delete_portfolio_text(message):
+    if message.text == 'Да, удалить':
+        id = message.chat.id
+        db = sqlite3.connect('moex_bot.sql')
+        cur = db.cursor()
+        sql = """
+        DELETE FROM portfolio WHERE id = ?
+        """
+        cur.execute(sql, (id,))
+        db.commit()
+        cur.close()
+        db.close()
+        bot.send_message(message.chat.id, 'Ваш портфель полностью удален')
+    elif message.text == 'Нет, назад':
+        pass
+    change_portfolio(message)
 
 bot.polling(none_stop=True)
